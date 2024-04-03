@@ -28,7 +28,7 @@
             <configuration>
               <transformers>
                 <transformer>
-                  <mainClass>com.fabarta.arcgraph.data.App</mainClass>
+                  <mainClass>org.myneo4j.impl.Main</mainClass>
                 </transformer>
                 <transformer />
               </transformers>
