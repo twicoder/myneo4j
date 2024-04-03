@@ -1,15 +1,11 @@
 package org.neo4j.api.core;
 
 import java.util.Map;
-
-// import nioneo.xa.NioNeoDbPersistenceSource;
-
 import org.neo4j.impl.core.NeoModule;
 import org.neo4j.impl.event.EventModule;
 import org.neo4j.impl.nioneo.xa.NioNeoDbPersistenceSource;
 import org.neo4j.impl.persistence.IdGeneratorModule;
 import org.neo4j.impl.persistence.PersistenceModule;
-import org.neo4j.impl.persistence.PersistenceSource;
 import org.neo4j.impl.transaction.TxModule;
 
 class NeoJvmInstance
@@ -47,11 +43,11 @@ class NeoJvmInstance
 		{
 			throw new RuntimeException( "A Neo instance already started" );
 		}
-		if ( clazz.getEnumConstants() == null )
-		{
-			throw new IllegalArgumentException( "No enum constants found in " + 
-				clazz );
-		}
+//		if ( clazz.getEnumConstants() == null )
+//		{
+//			throw new IllegalArgumentException( "No enum constants found in " + 
+//				clazz );
+//		}
 		
 		config = new Config();
 		config.getTxModule().setTxLogDirectory( storeDir );
@@ -73,7 +69,7 @@ class NeoJvmInstance
 		config.setNeoPersistenceSource( DEFAULT_DATA_SOURCE_NAME, create );
 		config.getNeoModule().setRelationshipTypes( clazz );
 		config.getIdGeneratorModule().setPersistenceSourceInstance( 
-			( PersistenceSource ) persistenceSource );
+			persistenceSource );
 		config.getEventModule().init();
 		config.getTxModule().init();
 		config.getPersistenceModule().init();
@@ -129,7 +125,7 @@ class NeoJvmInstance
 		private TxModule txModule;
 		private PersistenceModule persistenceModule;
 		private boolean create = false; 
-		private String persistenceSource;
+		private String persistenceSourceName;
 		private IdGeneratorModule idGeneratorModule;
 		private NeoModule neoModule;
 		
@@ -150,13 +146,13 @@ class NeoJvmInstance
 		 */
 		void setNeoPersistenceSource( String name, boolean create )
 		{
-			persistenceSource = name;
+			persistenceSourceName = name;
 			this.create = create;
 		}
 		
 		String getPersistenceSource()
 		{
-			return persistenceSource;
+			return persistenceSourceName;
 		}
 		
 		boolean getCreatePersistenceSource()
@@ -189,4 +185,15 @@ class NeoJvmInstance
 			return idGeneratorModule;
 		}
 	}
+
+	public static RelationshipType getRelationshipTypeByName( String name )
+    {
+	    return config.getNeoModule().getRelationshipTypeByName( name );
+    }
+
+	public static void addEnumRelationshipTypes( 
+		Class<? extends RelationshipType> relationshipTypes )
+    {
+	    config.getNeoModule().addEnumRelationshipTypes( relationshipTypes );
+    }
 }

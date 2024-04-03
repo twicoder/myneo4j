@@ -24,11 +24,13 @@ class RelationshipTypeHolder
 	private static Logger log = 
 		Logger.getLogger( RelationshipTypeHolder.class.getName() );
 	
-	private Class<? extends RelationshipType> enumClass;
+	private Set<Class<? extends RelationshipType>> enumClasses = 
+		new HashSet<Class<? extends RelationshipType>>();
 	private Map<String,Integer> relTypes = new HashMap<String,Integer>();
 	private Map<Integer,RelationshipType> relTranslation =
 		new HashMap<Integer,RelationshipType>();
-	private Set<String> validTypes = new HashSet<String>();
+	private Map<RelationshipType,String> validTypes = 
+		new HashMap<RelationshipType,String>();
 	
 	private RelationshipTypeHolder()
 	{
@@ -50,8 +52,8 @@ class RelationshipTypeHolder
 	public void addValidRelationshipTypes( 
 		Class<? extends RelationshipType> relTypeClass )
 	{
-		enumClass = relTypeClass;
-		for ( RelationshipType enumConstant : enumClass.getEnumConstants() )
+		enumClasses.add( relTypeClass );
+		for ( RelationshipType enumConstant : relTypeClass.getEnumConstants() )
 		{
 			String name = Enum.class.cast( enumConstant ).name();
 			if ( !relTypes.containsKey( name ) )
@@ -63,18 +65,25 @@ class RelationshipTypeHolder
 			{
 				relTranslation.put( relTypes.get( name ), enumConstant );
 			}
-			validTypes.add( name );
+			validTypes.put( enumConstant, name );
 		}
 	}
 
 	boolean isValidRelationshipType( RelationshipType type )
 	{
-		if ( type == null || !type.getClass().equals( this.enumClass ) )
+		if ( type == null || !enumClasses.contains( type.getClass() ) )
+			//type.getClass().equals( this.enumClass ) )
 		{
 			return false;
 		}
 		String name = Enum.class.cast( type ).name();
-		return validTypes.contains( name );
+		return relTypes.containsKey( name );
+		// .contains( name );
+	}
+	
+	RelationshipType getRelationshipTypeByName( String name )
+	{
+		return relTranslation.get( relTypes.get( name ) );
 	}
 
 	private int createRelationshipType( String name )
@@ -83,10 +92,10 @@ class RelationshipTypeHolder
 		boolean success = false;
 		int id = IdGenerator.getGenerator().nextId( 
 			RelationshipType.class );
-		CreateRelationshipTypeCommand command = null;
+		CreateRelationshipTypeCommand command = 
+			new CreateRelationshipTypeCommand();
 		try
 		{
-			command = new CreateRelationshipTypeCommand();
 			command.setId( id );
 			command.setName( name );
 			command.addToTransaction();
@@ -147,7 +156,7 @@ class RelationshipTypeHolder
 			addCommandToTransaction();
 		}
 
-		protected void onExecute() throws ExecuteFailedException
+		protected void onExecute()
 		{
 			RelationshipTypeHolder.getHolder().addRelType( 
 				name, id );

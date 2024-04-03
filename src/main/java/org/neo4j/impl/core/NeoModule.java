@@ -61,7 +61,10 @@ public class NeoModule
 		}
 		RelationshipTypeHolder rth = RelationshipTypeHolder.getHolder();
 		rth.addRawRelationshipTypes( relTypes );
-		rth.addValidRelationshipTypes( relTypeClass );
+		if ( relTypeClass != null )
+		{
+			rth.addValidRelationshipTypes( relTypeClass );
+		}
 		AdaptiveCacheManager.getManager().start();
 		startIsOk = false;
 	}
@@ -71,20 +74,10 @@ public class NeoModule
 		this.relTypeClass = clazz;
 	}
 
-//	public void setNodeCacheSize( int size )
-//	{
-//		NodeManager.getManager().resizeNodeCache( size );
-//	}
-	
 	public int getNodeCacheSize()
 	{
 		return NodeManager.getManager().getNodeMaxCacheSize();
 	}
-	
-//	public void setRelationshipCacheSize( int size )
-//	{
-//		NodeManager.getManager().resizeRelationshipCache( size );
-//	}
 	
 	public int getRelationshipCacheSize()
 	{
@@ -108,12 +101,11 @@ public class NeoModule
 	{
 		try
 		{
-			return new Integer( 
-				(int) NodeManager.getManager().getReferenceNode().getId() );
+			return (int) NodeManager.getManager().getReferenceNode().getId();
 		}
 		catch ( NotFoundException e )
 		{
-			return new Integer( -1 );
+			return -1;
 		}
 	}
 	
@@ -148,4 +140,17 @@ public class NeoModule
 	public void destroy()
 	{
 	}
+
+	public RelationshipType getRelationshipTypeByName( String name )
+    {
+		RelationshipTypeHolder rth = RelationshipTypeHolder.getHolder();
+		return rth.getRelationshipTypeByName( name );
+    }
+
+	public void addEnumRelationshipTypes( 
+		Class<? extends RelationshipType> relationshipTypes )
+    {
+		RelationshipTypeHolder rth = RelationshipTypeHolder.getHolder();
+		rth.addValidRelationshipTypes( relationshipTypes );
+    }
 }

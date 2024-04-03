@@ -53,7 +53,7 @@ import org.neo4j.impl.traversal.TraverserFactory;
  * Methods that uses commands will first create a command and verify that
  * we're in a transaction context. To persist operations a pro-active event 
  * is generated and will cause the 
- * {@link com.windh.kernel.persistence.BusinessLayerMonitor} to persist the 
+ * {@link org.neo4j.impl.persistence.BusinessLayerMonitor} to persist the 
  * then operation. 
  * If the event fails (false is returned)  the transaction is marked as 
  * rollback only and if the command will be undone.
@@ -209,17 +209,14 @@ class NodeImpl implements Node, Comparable
 			{
 				return Collections.emptyList();
 			}
-			else
+			List<Relationship> rels = new LinkedList<Relationship>(); 
+			Iterator<Integer> values = relationshipSet.iterator();
+			while ( values.hasNext() )
 			{
-				List<Relationship> rels = new LinkedList<Relationship>(); 
-				Iterator<Integer> values = relationshipSet.iterator();
-				while ( values.hasNext() )
-				{
-					rels.add( nodeManager.getRelationshipById( 
-						values.next() ) ); 
-				}
-				return rels;
+				rels.add( nodeManager.getRelationshipById( 
+					values.next() ) ); 
 			}
+			return rels;
 		}
 		finally
 		{
@@ -278,27 +275,24 @@ class NodeImpl implements Node, Comparable
 			{
 				return Collections.emptyList();
 			}
-			else
+			List<Relationship> rels = new LinkedList<Relationship>(); 
+			Iterator<Integer> values = relationshipSet.iterator();
+			while ( values.hasNext() )
 			{
-				List<Relationship> rels = new LinkedList<Relationship>(); 
-				Iterator<Integer> values = relationshipSet.iterator();
-				while ( values.hasNext() )
+				Relationship rel = nodeManager.getRelationshipById( 
+					values.next() ); 
+				if ( dir == Direction.OUTGOING &&
+					rel.getStartNode().equals( this ) )
 				{
-					Relationship rel = nodeManager.getRelationshipById( 
-						values.next() ); 
-					if ( dir == Direction.OUTGOING &&
-						rel.getStartNode().equals( this ) )
-					{
-						rels.add( rel );
-					}
-					else if ( dir == Direction.INCOMING &&
-						rel.getEndNode().equals( this ) )
-					{
-						rels.add( rel );
-					}
+					rels.add( rel );
 				}
-				return rels;
+				else if ( dir == Direction.INCOMING &&
+					rel.getEndNode().equals( this ) )
+				{
+					rels.add( rel );
+				}
 			}
+			return rels;
 		}
 		finally
 		{
@@ -355,7 +349,10 @@ class NodeImpl implements Node, Comparable
 		catch ( ExecuteFailedException e )
 		{
 			setRollbackOnly();
-			nodeCommand.undo();
+			if ( nodeCommand != null )
+			{
+				nodeCommand.undo();
+			}
 			throw new DeleteException( "Failed executing command deleting " +
 				this, e );
 		}
@@ -552,7 +549,10 @@ class NodeImpl implements Node, Comparable
 		}
 		catch ( ExecuteFailedException e )
 		{
-			nodeCommand.undo();
+			if ( nodeCommand != null )
+			{
+				nodeCommand.undo();
+			}
 			throw new IllegalValueException( "Failed executing command when " +
 				" adding property[" + key + "," + value + 
 				"] on " + this, e );
@@ -565,22 +565,17 @@ class NodeImpl implements Node, Comparable
 	
 	/**
 	 * Removes the property <CODE>key</CODE>. If null property <CODE>key</CODE> 
-	 * or the property doesn't exist a <CODE>NotFoundException</CODE> is 
-	 * thrown. 
-	 * <p>
-	 * If node is in first phase the cache is first checked and if the 
-	 * property isn't found the node enters full phase and the cache is 
-	 * checked again.
+	 * a <CODE>NotFoundException</CODE> is thrown. If property doesn't exist
+	 * <CODE>null</CODE> is returned. 
 	 *
 	 * @param key the property key
 	 * @return the removed property value
-	 * @throws NotFoundException
 	 */
-	public Object removeProperty( String key ) throws NotFoundException
+	public Object removeProperty( String key )
 	{
 		if ( key == null )
 		{
-			throw new NotFoundException( "Null parameter." );
+			throw new IllegalArgumentException( "Null parameter." );
 		}
 		acquireLock( this, LockType.WRITE );
 		NodeCommands nodeCommand = null;
@@ -588,7 +583,10 @@ class NodeImpl implements Node, Comparable
 		{
 			// if null or not found make sure full
 			ensureFullProperties();
-
+			if ( !propertyMap.containsKey( key ) )
+			{
+				return null;
+			}
 			nodeCommand = new NodeCommands(); 
 			nodeCommand.setNode( this );
 			
@@ -614,7 +612,10 @@ class NodeImpl implements Node, Comparable
 		}
 		catch ( ExecuteFailedException e )
 		{
-			nodeCommand.undo();
+			if ( nodeCommand != null )
+			{
+				nodeCommand.undo();
+			}
 			throw new NotFoundException( "Failed executing command " +
 				"while removing property[" + key + "] on " + this, e );
 		}
@@ -664,7 +665,10 @@ class NodeImpl implements Node, Comparable
 		}
 		catch ( ExecuteFailedException e )
 		{
-			nodeCommand.undo();
+			if ( nodeCommand != null )
+			{
+				nodeCommand.undo();
+			}
 			throw new IllegalValueException( "Failed executing command when " +
 				" changing property[" + key + "," + newValue + 
 				"] on " + this, e );
@@ -714,13 +718,6 @@ class NodeImpl implements Node, Comparable
 	 */
 	public boolean equals( Object o )
 	{
-		// the id check bellow isn't very expensive so this performance 
-		// optimization isn't worth it
-		// if ( this == o )
-		// {
-		// 	return true;
-		// }
-
 		// verify type and not null, should use Node inteface
 		if ( !(o instanceof Node) )
 		{
@@ -738,7 +735,7 @@ class NodeImpl implements Node, Comparable
 	}
 	
 	private volatile int hashCode = 0;
-	// must overide hashcode since equals is o
+	
 	public int hashCode()
 	{
 		// hashcode contract:
@@ -804,14 +801,6 @@ class NodeImpl implements Node, Comparable
 		if ( propertyMap.containsKey( key ) )
 		{
 			Property oldValue  = propertyMap.get( key );
-			if ( !oldValue.getValue().getClass().equals( 
-					newValue.getValue().getClass() ) )
-			{
-				throw new IllegalValueException( "New value[" + 
-					newValue.getValue() + 
-					" not same type as old value[" + 
-					oldValue.getValue() + "]" );
-			}
 			propertyMap.put( key, newValue );
 			return oldValue;
 		}
