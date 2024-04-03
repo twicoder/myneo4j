@@ -5,7 +5,7 @@ import org.neo4j.api.core.Direction;
 import org.neo4j.api.core.Node;
 import org.neo4j.api.core.Relationship;
 import org.neo4j.impl.shell.NeoApp;
-import org.neo4j.util.shell.CommandParser;
+import org.neo4j.util.shell.AppCommandParser;
 import org.neo4j.util.shell.OptionValueType;
 import org.neo4j.util.shell.Output;
 import org.neo4j.util.shell.Session;
@@ -31,11 +31,12 @@ public class Ls extends NeoApp
 	@Override
 	public String getDescription()
 	{
-		return "Lists the current node";
+		return "Lists the current node. Optionally supply node id for " +
+			"listing a certain node: ls <node-id>";
 	}
 	
 	@Override
-	protected String exec( CommandParser parser, Session session, Output out )
+	protected String exec( AppCommandParser parser, Session session, Output out )
 		throws ShellException, RemoteException
 	{
 		boolean verbose = parser.options().containsKey( "v" );
@@ -49,7 +50,18 @@ public class Ls extends NeoApp
 			displayProperties = true;
 			displayRelationships = true;
 		}
-		Node node = this.getCurrentNode( session );
+		
+		Node node = null;
+		if ( parser.arguments().isEmpty() )
+		{
+			node = this.getCurrentNode( session );
+		}
+		else
+		{
+			node = this.getNodeById(
+				Long.parseLong( parser.arguments().get( 0 ) ) );
+		}
+		
 		this.displayProperties( node, out, displayProperties, displayValues,
 			verbose );
 		this.displayRelationships( parser, node, out, displayRelationships );
@@ -82,7 +94,7 @@ public class Ls extends NeoApp
 		}
 	}
 	
-	private void displayRelationships( CommandParser parser, Node node,
+	private void displayRelationships( AppCommandParser parser, Node node,
 		Output out, boolean displayRelationships ) throws ShellException,
 		RemoteException
 	{
@@ -103,7 +115,7 @@ public class Ls extends NeoApp
 			{
 				out.println(
 					getDisplayNameForCurrentNode() +
-					" --[" + rel.getType() + "]--> " +
+					" --[" + rel.getType() + ", " + rel.getId() + "]--> " +
 					getDisplayNameForNode( rel.getEndNode() ) );
 			}
 		}
@@ -113,9 +125,9 @@ public class Ls extends NeoApp
 				node.getRelationships( Direction.INCOMING ) )
 			{
 				out.println(
-					getDisplayNameForNode( rel.getStartNode() ) +
-					" <--[" + rel.getType() + "]-- " +
-					getDisplayNameForCurrentNode() );
+					getDisplayNameForCurrentNode() +
+					" <--[" + rel.getType() + ", " + rel.getId() + "]-- " +
+					getDisplayNameForNode( rel.getStartNode() ) );
 			}
 		}
 	}
